@@ -6,25 +6,28 @@
 <title>Mastermind</title>
 <style>
   :root {
-    --bg: #f4f1ea;
-    --board: #fffdf8;
-    --ink: #1f1d1a;
-    --muted: #7a746a;
-    --hole: #e3ddd0;
-    --line: #e8e2d6;
-    --accent: #1f1d1a;
-    --c0: #e5484d; --c1: #f5a524; --c2: #f2d64b;
-    --c3: #30a46c; --c4: #3e7ce0; --c5: #8e4ec6;
+    --bg: #ece7df;
+    --ink: #2a1712;
+    --muted: #7c6a60;
+    --accent: #2a1712;
+    /* The board is brown plastic in both themes, like the 1970s original. */
+    --plastic: #6d3628;
+    --plastic-hi: #8f4c3a;
+    --plastic-lo: #4f241a;
+    --hole: #170806;
+    --engrave: #e9d2b4;
+    /* Original peg colors: red, blue, green, yellow, black, white. */
+    --c0: #d42a2a; --c1: #2160d4; --c2: #1d9142;
+    --c3: #f3c614; --c4: #1d1d1d; --c5: #f3f0e8;
+    --speck-dark: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1.4 -.72'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    --speck-light: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='2' seed='7' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .85 0 0 0 0 .75 0 1.3 0 0 -.74'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #161513;
-      --board: #201f1c;
-      --ink: #f1ede4;
-      --muted: #9a9387;
-      --hole: #34322d;
-      --line: #2c2a26;
-      --accent: #f1ede4;
+      --bg: #151210;
+      --ink: #f1e9df;
+      --muted: #a09184;
+      --accent: #f1e9df;
     }
   }
   * { box-sizing: border-box; }
@@ -41,52 +44,100 @@
   main { width: 100%; max-width: 380px; }
   h1 { margin: 0 0 4px; font-size: 28px; letter-spacing: -0.02em; }
   .sub { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+
+  .plastic {
+    background-color: var(--plastic);
+    background-image: var(--speck-light), var(--speck-dark),
+      linear-gradient(170deg, var(--plastic-hi), var(--plastic) 30%, var(--plastic-lo));
+  }
   .board {
-    background: var(--board);
-    border-radius: 14px;
-    padding: 12px;
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.06);
+    border-radius: 8px;
+    padding: 10px 14px 14px;
+    box-shadow:
+      inset 0 2px 0 rgb(255 255 255 / 0.14), inset 0 -3px 0 rgb(0 0 0 / 0.3),
+      0 2px 3px rgb(0 0 0 / 0.3), 0 14px 30px rgb(0 0 0 / 0.25);
   }
   .row {
     display: grid;
-    grid-template-columns: 22px auto 44px 1fr;
+    grid-template-columns: auto 40px 1fr;
     align-items: center;
-    gap: 10px;
-    padding: 7px 4px;
-    border-bottom: 1px solid var(--line);
+    gap: 12px;
+    padding: 7px 6px;
+    border-bottom: 1px solid rgb(0 0 0 / 0.28);
+    box-shadow: 0 1px 0 rgb(255 255 255 / 0.07);
   }
-  .row:last-child { border-bottom: none; }
-  .row.active { background: color-mix(in srgb, var(--hole) 45%, transparent); border-radius: 10px; }
-  .num { color: var(--muted); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+  .row:last-child { border-bottom: none; box-shadow: none; }
+  .row.active { background: rgb(255 225 190 / 0.1); border-radius: 6px; }
   .pegs { display: flex; gap: 10px; }
+
+  /* An empty hole: dark center inside a raised ring of plastic. */
   .peg {
-    width: 34px; height: 34px; border-radius: 50%;
-    background: var(--hole);
-    border: none; padding: 0;
-    box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.12);
+    width: 34px; height: 34px; border-radius: 50%; border: none; padding: 0;
+    background:
+      radial-gradient(circle, var(--hole) 0 30%, #2c120c 36%, transparent 40%),
+      linear-gradient(155deg, var(--plastic-hi), var(--plastic-lo));
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 1px 1px rgb(0 0 0 / 0.45);
   }
-  .peg.filled { box-shadow: inset 0 -3px 4px rgb(0 0 0 / 0.2), inset 0 2px 3px rgb(255 255 255 / 0.35); }
+  /* A peg: a glossy plastic dome in color --c. */
+  .peg.filled, .palette button, .fb.black, .fb.white {
+    background:
+      radial-gradient(circle at 36% 30%, rgb(255 255 255 / 0.85) 0 7%, transparent 24%),
+      radial-gradient(circle at 45% 40%, var(--c) 0 45%, color-mix(in srgb, var(--c) 55%, black) 100%);
+    box-shadow: 2px 3px 3px rgb(0 0 0 / 0.5);
+  }
   .row.active .peg { cursor: pointer; }
-  .row.active .peg.selected { outline: 2.5px solid var(--ink); outline-offset: 2px; }
-  .feedback {
-    display: grid; grid-template-columns: repeat(2, 12px); gap: 4px; justify-content: center;
+  .row.active .peg.selected { outline: 2.5px solid var(--engrave); outline-offset: 2px; }
+  .reveal .peg.filled { animation: pop 0.35s ease-out backwards; }
+  .reveal .peg:nth-child(2) { animation-delay: 0.08s; }
+  .reveal .peg:nth-child(3) { animation-delay: 0.16s; }
+  .reveal .peg:nth-child(4) { animation-delay: 0.24s; }
+  @keyframes pop { from { transform: scale(0.3); opacity: 0; } }
+
+  /* Key-peg holes in a 2x2 cluster. */
+  .feedback { display: grid; grid-template-columns: repeat(2, 11px); gap: 5px; justify-content: center; }
+  .fb {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: radial-gradient(circle, var(--hole) 0 22%, #3a1810 32%, var(--plastic-lo) 40%, var(--plastic-hi) 100%);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.12);
   }
-  .fb { width: 12px; height: 12px; border-radius: 50%; background: var(--hole); }
-  .fb.black { background: var(--ink); }
-  .fb.white { background: #fff; box-shadow: 0 0 0 1.5px var(--muted) inset; }
-  .secret { border-bottom: 2px dashed var(--line); margin-bottom: 4px; }
-  .secret .peg:not(.filled)::after {
-    content: "?"; display: grid; place-items: center; height: 100%;
-    color: var(--muted); font-weight: 600;
+  .fb.black { --c: #2a2a2a; box-shadow: 1px 2px 2px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(255 255 255 / 0.12); }
+  .fb.white { --c: #f6f3ec; box-shadow: 1px 2px 2px rgb(0 0 0 / 0.55); }
+
+  .count { font-size: 13px; color: var(--engrave); opacity: 0.85; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .count.solvable {
+    justify-self: start; padding: 2px 8px; border-radius: 999px; font-weight: 600; opacity: 1;
+    color: #fff; background: #1d9142; box-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
   }
-  .palette { display: flex; justify-content: space-between; margin: 18px 4px 14px; }
+
+  /* The secret row and the raised shield that hides it. */
+  .secret { border-bottom: 2px solid rgb(0 0 0 / 0.35); margin-bottom: 4px; padding-top: 4px; padding-bottom: 12px; }
+  .secret .pegs { position: relative; }
+  .shield {
+    position: absolute; inset: -6px -8px;
+    border-radius: 4px;
+    display: grid; place-items: center;
+    background-image: var(--speck-dark), linear-gradient(180deg, #8a4635, var(--plastic) 55%, #57281d);
+    box-shadow: inset 0 2px 0 rgb(255 255 255 / 0.2), inset 0 -2px 0 rgb(0 0 0 / 0.35), 0 4px 6px rgb(0 0 0 / 0.45);
+    font: 800 15px/1 "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: 0.12em; text-transform: uppercase; text-align: center;
+    color: var(--plastic);
+    text-shadow: -1px -1px 0 rgb(0 0 0 / 0.45), 1px 1px 0 rgb(255 255 255 / 0.22);
+  }
+
+  /* The peg tray. */
+  .palette {
+    display: flex; justify-content: space-between;
+    margin: 14px 0; padding: 12px 14px; border-radius: 8px;
+    box-shadow: inset 0 4px 8px rgb(0 0 0 / 0.55), inset 0 -1px 0 rgb(255 255 255 / 0.12), 0 1px 0 rgb(255 255 255 / 0.3);
+  }
   .palette button {
-    width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer;
-    box-shadow: inset 0 -3px 4px rgb(0 0 0 / 0.2), 0 1px 3px rgb(0 0 0 / 0.2);
+    width: 42px; height: 42px; border-radius: 50%; border: none; cursor: pointer;
     transition: transform 0.1s;
   }
   .palette button:hover { transform: translateY(-2px); }
   .palette button:active { transform: scale(0.94); }
+  .palette button:disabled { cursor: default; transform: none; filter: saturate(0.4) brightness(0.8); }
+
   .actions { display: flex; gap: 10px; }
   .actions button {
     flex: 1; height: 44px; border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer;
@@ -95,25 +146,20 @@
   .actions button.primary { background: var(--accent); color: var(--bg); }
   .actions button:disabled { opacity: 0.35; cursor: default; }
   .msg { min-height: 24px; margin: 14px 0 0; text-align: center; font-weight: 600; }
-  .count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .count.solvable {
-    justify-self: start; padding: 2px 8px; border-radius: 999px; font-weight: 600; color: var(--ink);
-    background: color-mix(in srgb, var(--c3) 25%, var(--board));
-  }
   .toggle { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 10px; font-size: 13px; color: var(--muted); cursor: pointer; }
   details { margin-top: 18px; color: var(--muted); font-size: 14px; }
   summary { cursor: pointer; }
-  button:focus-visible { outline: 2px solid var(--c4); outline-offset: 2px; }
+  button:focus-visible { outline: 2px solid var(--c1); outline-offset: 2px; }
 </style>
 </head>
 <body>
 <main>
   <h1>Mastermind</h1>
-  <p class="sub">Crack the 4-color code in 10 guesses. Colors can repeat.</p>
+  <p class="sub">Crack the 4-color code in 10 guesses. Colors can repeat. Guesses fill from the bottom up.</p>
 
-  <div class="board" id="board"></div>
+  <div class="board plastic" id="board"></div>
 
-  <div class="palette" id="palette" aria-label="Colors"></div>
+  <div class="palette plastic" id="palette" aria-label="Colors"></div>
 
   <div class="actions">
     <button id="undo">Undo</button>
@@ -128,15 +174,15 @@
 
   <details>
     <summary>How to play</summary>
-    <p>Click any slot in the highlighted row to select it, then pick a color from the palette. Click a filled slot to clear it. When all four are filled, press Guess.</p>
-    <p>Keys: 1–6 pick a color, ← → move between slots, Backspace undoes, Enter guesses.</p>
-    <p>A <b>black</b> dot means a right color in the right spot. A <b>white</b> dot means a right color in the wrong spot. Dots aren't in any particular order.</p>
+    <p>Click any hole in the highlighted row to select it, then pick a peg from the tray. Click a placed peg to remove it. When all four are filled, press Guess. Each new guess goes in the row above the last.</p>
+    <p>Keys: 1–6 pick a color, ← → move between holes, Backspace undoes, Enter guesses.</p>
+    <p>A <b>black</b> key peg means a right color in the right spot. A <b>white</b> key peg means a right color in the wrong spot. Key pegs aren't in any particular order.</p>
   </details>
 </main>
 
 <script>
 const COLORS = 6, PEGS = 4, TURNS = 10;
-const NAMES = ["red", "orange", "yellow", "green", "blue", "purple"];
+const NAMES = ["red", "blue", "green", "yellow", "black", "white"];
 
 // current: the active row, one color index or null per slot.
 // selected: the slot the next picked color goes into (null when the row is full).
@@ -207,7 +253,7 @@ function pegEl(c, onClick) {
   const b = document.createElement("button");
   b.className = "peg" + (c != null ? " filled" : "");
   if (c != null) {
-    b.style.background = color(c);
+    b.style.setProperty("--c", color(c));
     b.setAttribute("aria-label", NAMES[c]);
   } else {
     b.setAttribute("aria-label", "empty");
@@ -222,20 +268,28 @@ function render() {
 
   const sec = document.createElement("div");
   sec.className = "row secret";
-  sec.innerHTML = `<span class="num"></span>`;
   const sp = document.createElement("div");
-  sp.className = "pegs";
+  sp.className = "pegs" + (over ? " reveal" : "");
   secret.forEach(c => sp.append(pegEl(over ? c : null)));
+  if (!over) {
+    const shield = document.createElement("div");
+    shield.className = "shield";
+    shield.innerHTML = "Master<br>Mind";
+    shield.setAttribute("aria-label", "Hidden code");
+    sp.append(shield);
+  }
   sec.append(sp, document.createElement("span"), document.createElement("span"));
   board.append(sec);
 
+  // Rows are built first guess first (the counts narrow in that order),
+  // then shown bottom-up, like the physical board.
+  const rows = [];
   const showCount = $("showHint").checked;
   let pool = ALL_CODES;
   for (let t = 0; t < TURNS; t++) {
     const row = document.createElement("div");
     const active = !over && t === guesses.length;
     row.className = "row" + (active ? " active" : "");
-    row.innerHTML = `<span class="num">${t + 1}</span>`;
 
     const pegs = document.createElement("div");
     pegs.className = "pegs";
@@ -251,15 +305,14 @@ function render() {
 
     const fb = document.createElement("div");
     fb.className = "feedback";
-    if (t < guesses.length) {
-      const { black, white } = guesses[t];
-      fb.setAttribute("aria-label", `${black} black, ${white} white`);
-      for (let i = 0; i < PEGS; i++) {
-        const d = document.createElement("span");
-        d.className = "fb" + (i < black ? " black" : i < black + white ? " white" : "");
-        fb.append(d);
-      }
+    const res = guesses[t];
+    if (res) fb.setAttribute("aria-label", `${res.black} black, ${res.white} white`);
+    for (let i = 0; i < PEGS; i++) {
+      const d = document.createElement("span");
+      d.className = "fb" + (!res ? "" : i < res.black ? " black" : i < res.black + res.white ? " white" : "");
+      fb.append(d);
     }
+
     const count = document.createElement("span");
     count.className = "count";
     if (showCount && t < guesses.length) {
@@ -274,8 +327,9 @@ function render() {
       }
     }
     row.append(pegs, fb, count);
-    board.append(row);
+    rows.push(row);
   }
+  board.append(...rows.reverse());
 
   $("guess").disabled = over || !rowFull();
   $("undo").disabled = over || placed.length === 0;
@@ -319,7 +373,7 @@ function submit() {
 
 for (let c = 0; c < COLORS; c++) {
   const b = document.createElement("button");
-  b.style.background = color(c);
+  b.style.setProperty("--c", color(c));
   b.setAttribute("aria-label", NAMES[c]);
   b.onclick = () => pick(c);
   $("palette").append(b);
