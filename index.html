@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mastermind</title>
+<style>
+  :root {
+    --bg: #f4f1ea;
+    --board: #fffdf8;
+    --ink: #1f1d1a;
+    --muted: #7a746a;
+    --hole: #e3ddd0;
+    --line: #e8e2d6;
+    --accent: #1f1d1a;
+    --c0: #e5484d; --c1: #f5a524; --c2: #f2d64b;
+    --c3: #30a46c; --c4: #3e7ce0; --c5: #8e4ec6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161513;
+      --board: #201f1c;
+      --ink: #f1ede4;
+      --muted: #9a9387;
+      --hole: #34322d;
+      --line: #2c2a26;
+      --accent: #f1ede4;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px;
+  }
+  main { width: 100%; max-width: 380px; }
+  h1 { margin: 0 0 4px; font-size: 28px; letter-spacing: -0.02em; }
+  .sub { margin: 0 0 20px; color: var(--muted); font-size: 14px; }
+  .board {
+    background: var(--board);
+    border-radius: 14px;
+    padding: 12px;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 8px 24px rgb(0 0 0 / 0.06);
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 22px 1fr 44px;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .row:last-child { border-bottom: none; }
+  .row.active { background: color-mix(in srgb, var(--hole) 45%, transparent); border-radius: 10px; }
+  .num { color: var(--muted); font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; }
+  .pegs { display: flex; gap: 10px; }
+  .peg {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--hole);
+    border: none; padding: 0;
+    box-shadow: inset 0 2px 3px rgb(0 0 0 / 0.12);
+  }
+  .peg.filled { box-shadow: inset 0 -3px 4px rgb(0 0 0 / 0.2), inset 0 2px 3px rgb(255 255 255 / 0.35); }
+  .row.active .peg { cursor: pointer; }
+  .feedback {
+    display: grid; grid-template-columns: repeat(2, 12px); gap: 4px; justify-content: center;
+  }
+  .fb { width: 12px; height: 12px; border-radius: 50%; background: var(--hole); }
+  .fb.black { background: var(--ink); }
+  .fb.white { background: #fff; box-shadow: 0 0 0 1.5px var(--muted) inset; }
+  .secret { border-bottom: 2px dashed var(--line); margin-bottom: 4px; }
+  .secret .peg:not(.filled)::after {
+    content: "?"; display: grid; place-items: center; height: 100%;
+    color: var(--muted); font-weight: 600;
+  }
+  .palette { display: flex; justify-content: space-between; margin: 18px 4px 14px; }
+  .palette button {
+    width: 44px; height: 44px; border-radius: 50%; border: none; cursor: pointer;
+    box-shadow: inset 0 -3px 4px rgb(0 0 0 / 0.2), 0 1px 3px rgb(0 0 0 / 0.2);
+    transition: transform 0.1s;
+  }
+  .palette button:hover { transform: translateY(-2px); }
+  .palette button:active { transform: scale(0.94); }
+  .actions { display: flex; gap: 10px; }
+  .actions button {
+    flex: 1; height: 44px; border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer;
+    border: 1.5px solid var(--accent); background: transparent; color: var(--ink);
+  }
+  .actions button.primary { background: var(--accent); color: var(--bg); }
+  .actions button:disabled { opacity: 0.35; cursor: default; }
+  .msg { min-height: 24px; margin: 14px 0 0; text-align: center; font-weight: 600; }
+  details { margin-top: 18px; color: var(--muted); font-size: 14px; }
+  summary { cursor: pointer; }
+  button:focus-visible { outline: 2px solid var(--c4); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Mastermind</h1>
+  <p class="sub">Crack the 4-color code in 10 guesses. Colors can repeat.</p>
+
+  <div class="board" id="board"></div>
+
+  <div class="palette" id="palette" aria-label="Colors"></div>
+
+  <div class="actions">
+    <button id="undo">Undo</button>
+    <button id="guess" class="primary">Guess</button>
+  </div>
+  <div class="actions" style="margin-top:10px">
+    <button id="new">New game</button>
+  </div>
+
+  <p class="msg" id="msg" role="status"></p>
+
+  <details>
+    <summary>How to play</summary>
+    <p>Pick colors from the palette to fill the highlighted row (click a filled peg to clear it), then press Guess.</p>
+    <p>A <b>black</b> dot means a right color in the right spot. A <b>white</b> dot means a right color in the wrong spot. Dots aren't in any particular order.</p>
+  </details>
+</main>
+
+<script>
+const COLORS = 6, PEGS = 4, TURNS = 10;
+const NAMES = ["red", "orange", "yellow", "green", "blue", "purple"];
+
+let secret, guesses, current, over;
+
+const $ = id => document.getElementById(id);
+const color = i => `var(--c${i})`;
+
+function newGame() {
+  secret = Array.from({ length: PEGS }, () => Math.floor(Math.random() * COLORS));
+  guesses = [];
+  current = [];
+  over = false;
+  $("msg").textContent = "";
+  render();
+}
+
+function score(guess) {
+  let black = 0, white = 0;
+  const s = [], g = [];
+  for (let i = 0; i < PEGS; i++) {
+    if (guess[i] === secret[i]) black++;
+    else { s.push(secret[i]); g.push(guess[i]); }
+  }
+  for (const c of g) {
+    const j = s.indexOf(c);
+    if (j >= 0) { white++; s.splice(j, 1); }
+  }
+  return { black, white };
+}
+
+function pegEl(c, onClick) {
+  const b = document.createElement("button");
+  b.className = "peg" + (c != null ? " filled" : "");
+  if (c != null) {
+    b.style.background = color(c);
+    b.setAttribute("aria-label", NAMES[c]);
+  } else {
+    b.setAttribute("aria-label", "empty");
+  }
+  if (onClick) b.onclick = onClick; else b.tabIndex = -1;
+  return b;
+}
+
+function render() {
+  const board = $("board");
+  board.innerHTML = "";
+
+  const sec = document.createElement("div");
+  sec.className = "row secret";
+  sec.innerHTML = `<span class="num"></span>`;
+  const sp = document.createElement("div");
+  sp.className = "pegs";
+  secret.forEach(c => sp.append(pegEl(over ? c : null)));
+  sec.append(sp, document.createElement("span"));
+  board.append(sec);
+
+  for (let t = 0; t < TURNS; t++) {
+    const row = document.createElement("div");
+    const active = !over && t === guesses.length;
+    row.className = "row" + (active ? " active" : "");
+    row.innerHTML = `<span class="num">${t + 1}</span>`;
+
+    const pegs = document.createElement("div");
+    pegs.className = "pegs";
+    const data = t < guesses.length ? guesses[t].guess : active ? current : [];
+    for (let i = 0; i < PEGS; i++) {
+      const c = data[i];
+      const click = active && c != null ? () => { current.splice(i, 1); render(); } : null;
+      pegs.append(pegEl(c, click));
+    }
+
+    const fb = document.createElement("div");
+    fb.className = "feedback";
+    if (t < guesses.length) {
+      const { black, white } = guesses[t];
+      fb.setAttribute("aria-label", `${black} black, ${white} white`);
+      for (let i = 0; i < PEGS; i++) {
+        const d = document.createElement("span");
+        d.className = "fb" + (i < black ? " black" : i < black + white ? " white" : "");
+        fb.append(d);
+      }
+    }
+    row.append(pegs, fb);
+    board.append(row);
+  }
+
+  $("guess").disabled = over || current.length < PEGS;
+  $("undo").disabled = over || current.length === 0;
+  document.querySelectorAll("#palette button").forEach(b => b.disabled = over);
+}
+
+function pick(c) {
+  if (over || current.length >= PEGS) return;
+  current.push(c);
+  render();
+}
+
+function submit() {
+  if (over || current.length < PEGS) return;
+  const res = score(current);
+  guesses.push({ guess: current, ...res });
+  current = [];
+  if (res.black === PEGS) {
+    over = true;
+    $("msg").textContent = `Cracked it in ${guesses.length} ${guesses.length === 1 ? "guess" : "guesses"}!`;
+  } else if (guesses.length === TURNS) {
+    over = true;
+    $("msg").textContent = "Out of guesses. The code is shown at the top.";
+  }
+  render();
+}
+
+for (let c = 0; c < COLORS; c++) {
+  const b = document.createElement("button");
+  b.style.background = color(c);
+  b.setAttribute("aria-label", NAMES[c]);
+  b.onclick = () => pick(c);
+  $("palette").append(b);
+}
+$("guess").onclick = submit;
+$("undo").onclick = () => { current.pop(); render(); };
+$("new").onclick = newGame;
+document.addEventListener("keydown", e => {
+  if (e.key >= "1" && e.key <= String(COLORS)) pick(+e.key - 1);
+  else if (e.key === "Enter") submit();
+  else if (e.key === "Backspace") { if (current.length) { current.pop(); render(); } }
+});
+
+newGame();
+</script>
+</body>
+</html>
