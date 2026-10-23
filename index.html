@@ -49,7 +49,7 @@
   }
   .row {
     display: grid;
-    grid-template-columns: 22px 1fr 44px;
+    grid-template-columns: 22px auto 44px 1fr;
     align-items: center;
     gap: 10px;
     padding: 7px 4px;
@@ -94,11 +94,11 @@
   .actions button.primary { background: var(--accent); color: var(--bg); }
   .actions button:disabled { opacity: 0.35; cursor: default; }
   .msg { min-height: 24px; margin: 14px 0 0; text-align: center; font-weight: 600; }
-  .hint {
-    margin: 8px 0 0; padding: 10px 14px; border-radius: 10px; text-align: center; font-size: 14px;
-    background: var(--board); color: var(--muted);
+  .count { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .count.solvable {
+    justify-self: start; padding: 2px 8px; border-radius: 999px; font-weight: 600; color: var(--ink);
+    background: color-mix(in srgb, var(--c3) 25%, var(--board));
   }
-  .hint.solvable { background: color-mix(in srgb, var(--c3) 18%, var(--board)); color: var(--ink); font-weight: 600; }
   .toggle { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: 10px; font-size: 13px; color: var(--muted); cursor: pointer; }
   details { margin-top: 18px; color: var(--muted); font-size: 14px; }
   summary { cursor: pointer; }
@@ -123,8 +123,7 @@
   </div>
 
   <p class="msg" id="msg" role="status"></p>
-  <p class="hint" id="hint" aria-live="polite"></p>
-  <label class="toggle"><input type="checkbox" id="showHint" checked> Show whether the code can be deduced</label>
+  <label class="toggle"><input type="checkbox" id="showHint" checked> Show how many codes still fit after each guess</label>
 
   <details>
     <summary>How to play</summary>
@@ -165,35 +164,15 @@ function score(guess, code = secret) {
   return { black, white };
 }
 
-// Every code that would have produced exactly the feedback seen so far.
-function candidates() {
-  const out = [];
-  for (let n = 0; n < COLORS ** PEGS; n++) {
-    const code = [];
-    for (let i = 0, m = n; i < PEGS; i++, m = Math.floor(m / COLORS)) code.unshift(m % COLORS);
-    if (guesses.every(g => {
-      const r = score(g.guess, code);
-      return r.black === g.black && r.white === g.white;
-    })) out.push(code);
-  }
-  return out;
-}
+const ALL_CODES = Array.from({ length: COLORS ** PEGS }, (_, n) =>
+  Array.from({ length: PEGS }, (_, i) => Math.floor(n / COLORS ** (PEGS - 1 - i)) % COLORS));
 
-function renderHint() {
-  const el = $("hint");
-  el.hidden = over || !$("showHint").checked;
-  if (el.hidden) return;
-  const n = candidates().length;
-  if (guesses.length === 0) {
-    el.className = "hint";
-    el.textContent = `No clues yet. ${n.toLocaleString()} codes are possible.`;
-  } else if (n === 1) {
-    el.className = "hint solvable";
-    el.textContent = "Solvable: only one code fits your clues.";
-  } else {
-    el.className = "hint";
-    el.textContent = `Not solvable yet: ${n.toLocaleString()} codes still fit your clues.`;
-  }
+// Codes from the pool that would have produced exactly this guess's feedback.
+function consistent(pool, g) {
+  return pool.filter(code => {
+    const r = score(g.guess, code);
+    return r.black === g.black && r.white === g.white;
+  });
 }
 
 function pegEl(c, onClick) {
@@ -219,9 +198,11 @@ function render() {
   const sp = document.createElement("div");
   sp.className = "pegs";
   secret.forEach(c => sp.append(pegEl(over ? c : null)));
-  sec.append(sp, document.createElement("span"));
+  sec.append(sp, document.createElement("span"), document.createElement("span"));
   board.append(sec);
 
+  const showCount = $("showHint").checked;
+  let pool = ALL_CODES;
   for (let t = 0; t < TURNS; t++) {
     const row = document.createElement("div");
     const active = !over && t === guesses.length;
@@ -248,14 +229,26 @@ function render() {
         fb.append(d);
       }
     }
-    row.append(pegs, fb);
+    const count = document.createElement("span");
+    count.className = "count";
+    if (showCount && t < guesses.length) {
+      pool = consistent(pool, guesses[t]);
+      if (pool.length === 1) {
+        count.className += " solvable";
+        count.textContent = "1 ✓";
+        count.title = "Solvable: only one code fits your clues";
+      } else {
+        count.textContent = pool.length.toLocaleString();
+        count.title = `${pool.length} codes still fit your clues`;
+      }
+    }
+    row.append(pegs, fb, count);
     board.append(row);
   }
 
   $("guess").disabled = over || current.length < PEGS;
   $("undo").disabled = over || current.length === 0;
   document.querySelectorAll("#palette button").forEach(b => b.disabled = over);
-  renderHint();
 }
 
 function pick(c) {
@@ -292,7 +285,7 @@ $("new").onclick = newGame;
 try { $("showHint").checked = localStorage.getItem("mastermind.hint") !== "off"; } catch {}
 $("showHint").onchange = () => {
   try { localStorage.setItem("mastermind.hint", $("showHint").checked ? "on" : "off"); } catch {}
-  renderHint();
+  render();
 };
 document.addEventListener("keydown", e => {
   if (e.key >= "1" && e.key <= String(COLORS)) pick(+e.key - 1);
